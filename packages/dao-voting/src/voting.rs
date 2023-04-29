@@ -238,6 +238,30 @@ pub fn validate_voting_period(
     Ok((min, max))
 }
 
+/// Validates that the min voting range is less than the max voting
+/// range. Passes arguments through the function.
+pub fn validate_voting_range(
+    min: u64,
+    max: u64,
+) -> Result<(u64, u64), crate::error::VotingError> {
+    let min = min
+        .map(|min| {
+            let valid = match (min, max) {
+                (u64::Time(min), u64::Time(max)) => min <= max,
+                (u64::Height(min), u64::Height(max)) => min <= max,
+                _ => return Err(crate::error::VotingError::RangeUnitsConflict {}),
+            };
+            if valid {
+                Ok(min)
+            } else {
+                Err(crate::error::VotingError::InvalidMinVotingRange {})
+            }
+        })
+        .transpose()?;
+
+    Ok((min, max))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
