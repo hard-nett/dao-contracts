@@ -36,7 +36,7 @@ impl VotingStrategy {
 #[cw_serde]
 #[derive(Copy)]
 pub struct EntryJudgingVote {
-    // A vote indicates which option the user has selected, and the number of points allocated to that option
+// A vote indicates which option the user has selected, and the number of points allocated to that option
     pub option_id: u32,
     pub vote: Uint128,
 }

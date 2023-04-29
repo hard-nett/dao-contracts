@@ -37,9 +37,9 @@ pub struct Config {
 
     pub allow_proposal_edit: bool,
 
-    pub min_voting_element_range: 
+    pub min_voting_element_range: u64,
 
-    pub max_voting_element_range:
+    pub max_voting_element_range: u64,
 
         /// The address of the DAO that this governance module is
     /// associated with.
@@ -69,7 +69,7 @@ pub struct Ballot {
 /// The current top level config for the module.
 pub const CONFIG: Item<Config> = Item::new("config")
 pub const PROPOSAL_COUNT: Item<u64> = Item::new("proposal_count");
-pub const PROPOSALS: Map<u64, MultipleChoiceProposal> = Map::new("proposals");
+pub const PROPOSALS: Map<u64, EntryJudgingProposal> = Map::new("proposals");
 pub const BALLOTS: Map<(u64, &Addr), Ballot> = Map::new("ballots");
 /// Consumers of proposal state change hooks.
 pub const PROPOSAL_HOOKS: Hooks = Hooks::new("proposal_hooks");

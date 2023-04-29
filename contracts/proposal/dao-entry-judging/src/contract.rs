@@ -38,22 +38,42 @@ use crate::{
 };
 
 
-// Actions for event-flow added:
+// Event-Flow
+// This module is meant to have a single use lifecycle. 
+
+// The circle of event-flow life-cycle:
+//
+// a. Instantiation - this is when the proposal module is configured, including the time desired for the interaction phase
+// b. Interaction - this starts when an admin starts the proposal module. Once the module has been started,  this is when proposals can be made & voted on. 
+// c. Completion - interaction with the module is complete, no more state modifications can be made unless migration approval from dao.
+// d. Iteration  - daos can choose to create another module , used to recognize chronological reuse for the same event, similar to subDAO.
+
+// The main function we desire this contract to provide is:
+// 1. Handle config for entry-judging module parameters
+// 2. tally of voting points given to each proposal choice available
+// 3. calculate results via points of each proposal & their choices
+// 
+//   The goal here is to rely on the points given to each entry, so that by the time the module interaction 
+//   timeline ends, we can calculate the proposals with the most votes,
+//    by judges to be what determines the results of the proposal module winner.
+//
+//
 
 //   *************** Creating The Judging Module *********************
 //  - set min & max voting range
 //  - set if only admins create proposals
-//  - set a max number of created proposals permitted per DAO member
 //  - set if proposal metadata is mutable 
-//  - 
+//  - set a max number of created proposals permitted per DAO member
+//  
 //
 //
 //    *************** Using The Judging Module *********************
-//
+//  - vote
+//  - query_votes_by_choice: query the votes of a 
 //
 //
 //  *************** Notable Judging Module Checks *********************
-//  - may need to check if judge has uploaded more entries than permitted
+//  - check if judge has uploaded more entries than permitted
 //  - 
 
 
