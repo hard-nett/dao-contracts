@@ -349,6 +349,10 @@ pub fn execute_vote(
         return Err(ContractError::Expired { id: proposal_id });
     }
 
+    // Check if the sender is not the same as the entry maker
+    if info.sender == entry.maker_addr {
+        return Err(ContractError::InvalidMaker {});
+    };
 
     let vote_power = get_voting_power(
         deps.as_ref(),
@@ -392,6 +396,7 @@ pub fn execute_vote(
     let old_status = prop.status;
 
     prop.votes.add_vote(vote, vote_power)?;
+    prop.votes.add_vote_points(vote, points)?;
     prop.update_status(&env.block)?;
     PROPOSALS.save(deps.storage, proposal_id, &prop)?;
     let new_status = prop.status;
