@@ -1,4 +1,4 @@
-use cosmwasm_std::{coin, coins, Addr, Coin};
+use cosmwasm_std::{coin, coins};
 use cw_denom::UncheckedDenom;
 use cw_orch::{contract::interface_traits::CwOrchQuery, mock::MockBech32};
 
@@ -7,7 +7,7 @@ use crate::{
         AdapterQueryMsg, AllOptionsResponse, AllSubmissionsResponse, AssetUnchecked,
         CheckOptionResponse,
     },
-    multitest::suite::{create_native_submission_helper, setup_gauge_adapter, SuiteBuilder},
+    multitest::suite::{create_native_submission_helper, setup_gauge_adapter},
 };
 
 #[test]
@@ -23,6 +23,7 @@ fn option_queries() {
 
     let recipient = mock.addr_make("recipient");
     let newton = mock.addr_make("newton");
+    let treasury = mock.addr_make("community_pool");
     let einstein = mock
         .addr_make_with_balance("einstein", coins(1_000, "juno"))
         .unwrap();
@@ -58,7 +59,7 @@ fn option_queries() {
         AllOptionsResponse {
             options: vec![
                 einstein.to_string(),
-                mock.addr_make("community_pool").to_string(),
+                treasury.to_string(),
                 recipient.to_string()
             ]
         },

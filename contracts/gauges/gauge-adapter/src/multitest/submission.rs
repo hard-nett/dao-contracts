@@ -1,3 +1,4 @@
+// use crate::msg::{AdapterQueryMsgFns, ExecuteMsgFns};
 use crate::{
     msg::{
         AdapterQueryMsg, AllSubmissionsResponse, AssetUnchecked, ExecuteMsg, ReceiveMsg,
@@ -6,47 +7,29 @@ use crate::{
     multitest::suite::{create_native_submission_helper, cw20_helper, setup_gauge_adapter},
     ContractError,
 };
-
-use super::suite::{GaugeAdapter, SuiteBuilder};
-use crate::msg::InstantiateMsg as GaugeOrchInstantiateMsg;
-
 use abstract_cw20::msg::Cw20ExecuteMsgFns;
 use abstract_cw20_base::msg::QueryMsgFns;
 use cosmwasm_std::{coin, to_json_binary, Addr, Uint128};
 use cw_denom::UncheckedDenom;
-use cw_orch::{
-    contract::interface_traits::{CwOrchExecute, CwOrchInstantiate, CwOrchUpload},
-    environment::IndexResponse,
-    mock::{cw_multi_test::AppResponse, MockBech32},
-    prelude::*,
-};
+use cw_orch::{contract::interface_traits::CwOrchExecute, mock::MockBech32, prelude::*};
 
 #[test]
 fn create_default_submission() {
     let mock = MockBech32::new("mock");
-    let com_pool = &mock.addr_make("community_pool").to_string();
+    let treasury = &mock.addr_make("community_pool");
 
     let adapter = setup_gauge_adapter(mock.clone(), None);
-
-    let msg = &ExecuteMsg::CreateSubmission {
-        name: "Unimpressed".to_owned(),
-        url: "Those funds go back to the community pool".to_owned(),
-        address: "mock1eq4aagr86henn5uaxu7xsneefyh2k2srt85q9znjuml36xfgssgqseh4dl".into(),
-    };
-
     // this one is created by default during instantiation
     assert_eq!(
         SubmissionResponse {
             sender: adapter.address().unwrap(),
             name: "Unimpressed".to_owned(),
             url: "Those funds go back to the community pool".to_owned(),
-            address: Addr::unchecked(
-                "mock1eq4aagr86henn5uaxu7xsneefyh2k2srt85q9znjuml36xfgssgqseh4dl"
-            ),
+            address: treasury.clone(),
         },
         adapter
             .query(&crate::msg::AdapterQueryMsg::Submission {
-                address: com_pool.to_string()
+                address: treasury.to_string(),
             })
             .unwrap()
     )
@@ -116,15 +99,15 @@ fn overwrite_existing_submission() {
     let mock = MockBech32::new("mock");
     let adapter = setup_gauge_adapter(mock.clone(), None);
     let recipient = mock.addr_make("recipient");
-    let create = create_native_submission_helper(
+    create_native_submission_helper(
         adapter.clone(),
         mock.sender.clone(),
         recipient.clone(),
         None,
     )
     .unwrap();
-    let create: SubmissionResponse = adapter
-        .query(&AdapterQueryMsg::Submission {
+    adapter
+        .query::<SubmissionResponse>(&AdapterQueryMsg::Submission {
             address: recipient.to_string(),
         })
         .unwrap();
@@ -541,8 +524,7 @@ fn return_deposits_required_cw20_deposit() {
     //     )
     //     .unwrap();
 
-    cw20
-        .send(1_000u128.into(), adapter.addr_str().unwrap(), binary_msg)
+    cw20.send(1_000u128.into(), adapter.addr_str().unwrap(), binary_msg)
         .unwrap();
 
     assert_eq!(
