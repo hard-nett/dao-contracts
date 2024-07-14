@@ -74,7 +74,7 @@ pub fn create_native_submission_helper(
     }
 }
 
-pub fn cw20_helper(mock: MockBech32) -> (Cw20Base<MockBech32>) {
+pub fn cw20_helper(mock: MockBech32) -> Cw20Base<MockBech32> {
     let cw20 = Cw20Base::new("cw20", mock.clone());
     cw20.upload().unwrap();
     init_cw20(cw20.clone(), mock.sender.to_string());
