@@ -1,5 +1,5 @@
 use abstract_cw_plus_interface::cw20_base::Cw20Base;
-use cosmwasm_std::{Addr, Coin, Uint128};
+use cosmwasm_std::{coins, Addr, BankMsg, Coin, CosmosMsg, Uint128};
 use cw_orch::{interface, mock::cw_multi_test::AppResponse, prelude::*};
 use cw_orch_core::CwEnvError;
 
@@ -7,7 +7,10 @@ use abstract_cw20::{Cw20Coin as AbsCw20Coin, MinterResponse};
 
 use crate::{
     contract::{execute, instantiate, migrate, query},
-    msg::{AdapterQueryMsg as QueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg, MigrateMsg},
+    msg::{
+        AdapterQueryMsg as QueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg, MigrateMsg,
+        PossibleMsg,
+    },
 };
 
 // Store the marketing gauge adapter contract and returns the code id.
@@ -39,6 +42,10 @@ pub fn setup_gauge_adapter(
         required_deposit,
         reward: AssetUnchecked::new_native("juno", 1_000_000),
         community_pool: mock.addr_make("community_pool").to_string(),
+        possible_msgs: vec![PossibleMsg {
+            stargate: todo!(),
+            max_amount: todo!(),
+        }],
     };
     adapter.instantiate(&instantiate, None, None).unwrap();
     adapter
@@ -57,6 +64,7 @@ pub fn native_submission_helper(
                 name: "DAOers".to_string(),
                 url: "https://daodao.zone".to_string(),
                 address: recipient.to_string(),
+                message: todo!(),
             },
             Some(&[assets]),
         );
@@ -67,6 +75,7 @@ pub fn native_submission_helper(
                 name: "DAOers".to_string(),
                 url: "https://daodao.zone".to_string(),
                 address: recipient.to_string(),
+                message: todo!(),
             },
             None,
         );

@@ -1,7 +1,9 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::{Addr, Binary, CosmosMsg, Uint128};
 use cw_denom::CheckedDenom;
 use cw_storage_plus::{Item, Map};
+
+use crate::msg::{PossibleMsg, SubmissionMsg};
 
 #[cw_serde]
 pub struct Config {
@@ -13,6 +15,8 @@ pub struct Config {
     pub community_pool: Addr,
     /// Total reward amount.
     pub reward: Asset,
+    /// Possible msgs that submissions can include.
+    pub possible_msgs: Vec<PossibleMsg>,
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
@@ -28,6 +32,7 @@ pub struct Submission {
     pub sender: Addr,
     pub name: String,
     pub url: String,
+    pub msg: SubmissionMsg,
 }
 
 // All submissions mapped by fund destination address.

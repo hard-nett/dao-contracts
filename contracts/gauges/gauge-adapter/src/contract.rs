@@ -1,19 +1,23 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_json, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
-    StdResult, Uint128,
+    coin, coins, from_json, to_json_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Empty,
+    Env, MessageInfo, Order, Response, StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
-use cw20::Cw20ReceiveMsg;
+use cw20::{Cw20Coin, Cw20ExecuteMsg, Cw20ReceiveMsg};
 use cw_denom::UncheckedDenom;
 use cw_utils::{one_coin, PaymentError};
 
-use crate::error::ContractError;
-use crate::msg::{
-    AdapterQueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg, MigrateMsg, ReceiveMsg,
+use crate::{
+    error::ContractError,
+    msg::{
+        AdapterQueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg, MigrateMsg, ReceiveMsg,
+        StargateWire, SubmissionMsg,
+    },
+    state::{Config, Submission, CONFIG, SUBMISSIONS},
 };
-use crate::state::{Config, Submission, CONFIG, SUBMISSIONS};
+use anybuf::{Anybuf, Bufany};
 
 // Version info for migration info.
 const CONTRACT_NAME: &str = "crates.io:marketing-gauge-adapter";
@@ -27,16 +31,16 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
+    let denom = msg.reward.denom.clone();
+    let amount = msg.reward.amount.clone();
     let community_pool = deps.api.addr_validate(&msg.community_pool)?;
-    SUBMISSIONS.save(
+
+    initialize_submissions(
         deps.storage,
+        env.contract.address,
         community_pool.clone(),
-        &Submission {
-            sender: env.contract.address,
-            name: "Unimpressed".to_owned(),
-            url: "Those funds go back to the community pool".to_owned(),
-        },
+        denom.clone(),
+        amount.clone(),
     )?;
 
     let config = Config {
@@ -47,10 +51,52 @@ pub fn instantiate(
             .transpose()?,
         community_pool,
         reward: msg.reward.into_checked(deps.as_ref())?,
+        possible_msgs: msg.possible_msgs,
     };
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new())
+}
+
+fn initialize_submissions(
+    store: &mut dyn Storage,
+    adapter: Addr,
+    treasury: Addr,
+    denom: UncheckedDenom,
+    amount: Uint128,
+) -> Result<(), ContractError> {
+    let sub_msg: SubmissionMsg = match denom {
+        UncheckedDenom::Native(d) => SubmissionMsg {
+            stargate: StargateWire::Bank(crate::msg::AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&CosmosMsg::<Empty>::Bank(BankMsg::Send {
+                to_address: treasury.to_string(),
+                amount: coins(amount.into(), d),
+            }))?,
+        },
+        UncheckedDenom::Cw20(c) => SubmissionMsg {
+            stargate: StargateWire::Wasm(crate::msg::AdapterWasmMsg::Execute()),
+            msg: to_json_binary(&CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
+                contract_addr: c,
+                msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: treasury.to_string(),
+                    amount: amount.clone(),
+                })?,
+                funds: vec![],
+            }))?,
+        },
+    };
+
+    SUBMISSIONS.save(
+        store,
+        treasury.clone(),
+        &Submission {
+            sender: adapter,
+            name: "Unimpressed".to_owned(),
+            url: "Those funds go back to the community pool".to_owned(),
+            msg: sub_msg,
+        },
+    )?;
+    Ok(())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -62,7 +108,12 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20_message(deps, info, msg),
-        ExecuteMsg::CreateSubmission { name, url, address } => {
+        ExecuteMsg::CreateSubmission {
+            name,
+            url,
+            address,
+            message,
+        } => {
             let received = match one_coin(&info) {
                 Ok(coin) => Ok(Some(coin)),
                 Err(PaymentError::NoFunds {}) => Ok(None),
@@ -73,7 +124,7 @@ pub fn execute(
                 amount: x.amount,
             });
 
-            execute::create_submission(deps, info.sender, name, url, address, received)
+            execute::create_submission(deps, info.sender, name, url, address, received, message)
         }
         ExecuteMsg::ReturnDeposits {} => execute::return_deposits(deps, info.sender),
     }
@@ -85,7 +136,12 @@ fn receive_cw20_message(
     msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     match from_json(&msg.msg)? {
-        ReceiveMsg::CreateSubmission { name, url, address } => execute::create_submission(
+        ReceiveMsg::CreateSubmission {
+            name,
+            url,
+            address,
+            message,
+        } => execute::create_submission(
             deps,
             Addr::unchecked(msg.sender),
             name,
@@ -95,11 +151,14 @@ fn receive_cw20_message(
                 info.sender.as_str(),
                 msg.amount.u128(),
             )),
+            message,
         ),
     }
 }
 
 pub mod execute {
+    use crate::msg::SubmissionMsg;
+
     use super::*;
 
     use cosmwasm_std::{ensure_eq, CosmosMsg};
@@ -111,6 +170,7 @@ pub mod execute {
         url: String,
         address: String,
         received: Option<AssetUnchecked>,
+        msg: SubmissionMsg,
     ) -> Result<Response, ContractError> {
         let address = deps.api.addr_validate(&address)?;
 
@@ -118,7 +178,8 @@ pub mod execute {
             required_deposit,
             community_pool: _,
             reward: _,
-            admin: _,
+            admin,
+            possible_msgs,
         } = CONFIG.load(deps.storage)?;
         if let Some(required_deposit) = required_deposit {
             if let Some(received) = received {
@@ -151,7 +212,23 @@ pub mod execute {
             }
         }
 
-        SUBMISSIONS.save(deps.storage, address, &Submission { sender, name, url })?;
+        // confirm msg is one of possible_msgs
+        for messages in possible_msgs {
+            if messages.stargate != msg.stargate {
+                return Err(ContractError::Unauthorized {});
+            }
+        }
+
+        SUBMISSIONS.save(
+            deps.storage,
+            address,
+            &Submission {
+                sender,
+                name,
+                url,
+                msg,
+            },
+        )?;
         Ok(Response::new().add_attribute("create", "submission"))
     }
 
@@ -161,6 +238,7 @@ pub mod execute {
             required_deposit,
             community_pool: _,
             reward: _,
+            possible_msgs,
         } = CONFIG.load(deps.storage)?;
 
         // No refund if no deposit was required.
@@ -202,14 +280,44 @@ pub fn query(deps: Deps, _env: Env, msg: AdapterQueryMsg) -> StdResult<Binary> {
 }
 
 mod query {
-    use cosmwasm_std::{CosmosMsg, Decimal, StdError};
+    use cosmwasm_std::{Coin, CosmosMsg, Decimal, StdError};
 
-    use crate::msg::{
-        AllOptionsResponse, AllSubmissionsResponse, CheckOptionResponse, SampleGaugeMsgsResponse,
-        SubmissionResponse,
+    use crate::{
+        encode_bank_submission_msg_anybuf,
+        msg::{
+            AllOptionsResponse, AllSubmissionsResponse, CheckOptionResponse,
+            SampleGaugeMsgsResponse, SubmissionResponse,
+        },
+        parse_bank_submission_msg_bufany,
     };
 
     use super::*;
+
+    pub fn stargate_to_anybuf(deps: Deps, winner: Addr, fraction: Decimal) -> StdResult<CosmosMsg> {
+        let mut anybuf: Anybuf = Anybuf::new();
+        // get winners SubmissionMsg
+        let Submission { msg, sender, .. } = SUBMISSIONS.load(deps.storage, winner)?;
+        let dao = CONFIG.load(deps.storage)?.admin;
+
+        match msg.stargate {
+            StargateWire::Bank(b) => match b {
+                crate::msg::AdapterBankMsg::MsgSend() => {
+                    // get amount from binaryMsg
+                    let bufany = parse_bank_submission_msg_bufany(msg.msg);
+
+                    let msg = encode_bank_submission_msg_anybuf(
+                        anybuf,
+                        bufany.0,
+                        dao.to_string(),
+                        bufany.1,
+                        fraction,
+                    )?;
+                    Ok(msg)
+                }
+            },
+            StargateWire::Wasm(_) => return Err(StdError::GenericErr { msg: "ahh".into() }),
+        }
+    }
 
     pub fn all_options(deps: Deps) -> StdResult<AllOptionsResponse> {
         Ok(AllOptionsResponse {
@@ -234,18 +342,11 @@ mod query {
 
         let execute = winners
             .into_iter()
-            .map(|(to_address, fraction)| {
+            .map(|(winner, fraction)| {
                 // Gauge already sends chosen tally to this query by using results we send in
                 // all_options query; they are already validated
-                let to_address = deps.api.addr_validate(&to_address)?;
+                stargate_to_anybuf(deps, deps.api.addr_validate(&winner)?, fraction)
 
-                reward.denom.get_transfer_to_message(
-                    &to_address,
-                    reward
-                        .amount
-                        .checked_mul_floor(fraction)
-                        .map_err(|x| StdError::generic_err(x.to_string()))?,
-                )
             })
             .collect::<StdResult<Vec<CosmosMsg>>>()?;
         Ok(SampleGaugeMsgsResponse { execute })
@@ -298,7 +399,10 @@ mod tests {
     use cw20::Cw20ExecuteMsg;
     use cw_denom::CheckedDenom;
 
-    use crate::{msg::AssetUnchecked, state::Asset};
+    use crate::{
+        msg::{AssetUnchecked, PossibleMsg},
+        state::Asset,
+    };
 
     #[test]
     fn proper_initialization() {
@@ -308,6 +412,10 @@ mod tests {
             required_deposit: Some(AssetUnchecked::new_cw20("wynd", 10_000_000)),
             community_pool: "community".to_owned(),
             reward: AssetUnchecked::new_native("ujuno", 150_000_000_000),
+            possible_msgs: vec![PossibleMsg {
+                stargate: todo!(),
+                max_amount: todo!(),
+            }],
         };
         instantiate(
             deps.as_mut(),
@@ -375,6 +483,10 @@ mod tests {
             required_deposit: Some(AssetUnchecked::new_cw20("wynd", 10_000_000)),
             community_pool: "community".to_owned(),
             reward: AssetUnchecked::new_native("ujuno", reward.into()),
+            possible_msgs: vec![PossibleMsg {
+                stargate: todo!(),
+                max_amount: todo!(),
+            }],
         };
         instantiate(deps.as_mut(), mock_env(), mock_info("user", &[]), msg).unwrap();
 
@@ -423,6 +535,10 @@ mod tests {
             required_deposit: Some(AssetUnchecked::new_cw20("wynd", 10_000_000)),
             community_pool: "community".to_owned(),
             reward: AssetUnchecked::new_cw20("wynd", reward.into()),
+            possible_msgs: vec![PossibleMsg {
+                stargate: todo!(),
+                max_amount: todo!(),
+            }],
         };
         instantiate(deps.as_mut(), mock_env(), mock_info("user", &[]), msg).unwrap();
 
@@ -484,6 +600,10 @@ mod tests {
             required_deposit: None,
             community_pool: "community".to_owned(),
             reward: AssetUnchecked::new_native("ujuno", 150_000_000_000),
+            possible_msgs: vec![PossibleMsg {
+                stargate: todo!(),
+                max_amount: todo!(),
+            }],
         };
         instantiate(
             deps.as_mut(),

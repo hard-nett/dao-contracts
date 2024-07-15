@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, CosmosMsg, Decimal, Uint128};
+use cosmwasm_std::{Addr, Binary, CosmosMsg, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 use cw_denom::UncheckedDenom;
 
@@ -13,6 +13,8 @@ pub struct InstantiateMsg {
     pub community_pool: String,
     /// Total reward amount.
     pub reward: AssetUnchecked,
+    /// Possible messages submission can include.
+    pub possible_msgs: Vec<PossibleMsg>,
 }
 
 #[cw_serde]
@@ -26,6 +28,7 @@ pub enum ExecuteMsg {
         name: String,
         url: String,
         address: String,
+        message: SubmissionMsg,
     },
     /// Sends back all deposit to senders.
     ReturnDeposits {},
@@ -39,6 +42,7 @@ pub enum ReceiveMsg {
         name: String,
         url: String,
         address: String,
+        message: SubmissionMsg,
     },
 }
 
@@ -102,4 +106,42 @@ pub struct AllSubmissionsResponse {
 pub struct AssetUnchecked {
     pub denom: UncheckedDenom,
     pub amount: Uint128,
+}
+
+#[cw_serde]
+pub struct PossibleMsg {
+    pub stargate: StargateWire,
+    pub max_amount: Option<Uint128>,
+}
+#[cw_serde]
+pub struct SubmissionMsg {
+    pub stargate: StargateWire,
+    pub msg: Binary,
+}
+
+#[cw_serde]
+pub enum StargateWire {
+    Bank(AdapterBankMsg),
+    // Gov(),
+    // Ibc(),
+    // Distribution(),
+    // Staking(AdapterStakingMsg),
+    Wasm(AdapterWasmMsg),
+}
+
+#[cw_serde]
+pub enum AdapterBankMsg {
+    // MsgBurn(),
+    MsgSend(),
+}
+// #[cw_serde]
+// pub enum AdapterStakingMsg {
+//     Delegate(),
+//     Undelegate(),
+//     Redelegate(),
+// }
+#[cw_serde]
+pub enum AdapterWasmMsg {
+    Execute(),
+    // Instantiate(),
 }

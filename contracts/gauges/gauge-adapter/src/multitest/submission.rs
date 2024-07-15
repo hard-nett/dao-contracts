@@ -3,23 +3,15 @@ use crate::{
         AdapterQueryMsg, AdapterQueryMsgFns, AllSubmissionsResponse, AssetUnchecked, ExecuteMsg,
         ExecuteMsgFns, ReceiveMsg, SubmissionResponse,
     },
-    multitest::suite::{native_submission_helper, cw20_helper, setup_gauge_adapter},
+    multitest::suite::{cw20_helper, native_submission_helper, setup_gauge_adapter},
     ContractError,
 };
-
-use super::suite::GaugeAdapter;
-use crate::msg::InstantiateMsg as GaugeOrchInstantiateMsg;
 
 use abstract_cw20::msg::Cw20ExecuteMsgFns;
 use abstract_cw20_base::msg::QueryMsgFns;
 use cosmwasm_std::{coin, to_json_binary, Addr, Uint128};
 use cw_denom::UncheckedDenom;
-use cw_orch::{
-    contract::interface_traits::{CwOrchExecute, CwOrchInstantiate, CwOrchUpload},
-    environment::IndexResponse,
-    mock::{cw_multi_test::AppResponse, MockBech32},
-    prelude::*,
-};
+use cw_orch::{mock::MockBech32, prelude::*};
 
 #[test]
 fn create_default_submission() {
@@ -258,6 +250,7 @@ fn create_receive_required_deposit() {
         name: "DAOers".into(),
         url: "https://daodao.zone".into(),
         address: recipient.clone(),
+        message: todo!(),
     })
     .unwrap();
     // Fails by sending wrong cw20.
@@ -494,6 +487,7 @@ fn return_deposits_required_cw20_deposit() {
         name: "DAOers".into(),
         url: "https://daodao.zone".into(),
         address: recipient.to_string(),
+        message: todo!(),
     })
     .unwrap();
 
