@@ -1,11 +1,11 @@
-use cosmwasm_std::{coin, coins};
+use cosmwasm_std::{coin, coins, to_json_binary, BankMsg};
 use cw_denom::UncheckedDenom;
 use cw_orch::{contract::interface_traits::CwOrchQuery, mock::MockBech32};
 
 use crate::{
     msg::{
-        AdapterQueryMsg, AllOptionsResponse, AllSubmissionsResponse, AssetUnchecked,
-        CheckOptionResponse,
+        AdapterBankMsg, AdapterQueryMsg, AllOptionsResponse, AllSubmissionsResponse,
+        AssetUnchecked, CheckOptionResponse, PossibleMsg, SubmissionMsg,
     },
     multitest::suite::{native_submission_helper, setup_gauge_adapter},
 };
@@ -19,6 +19,10 @@ fn option_queries() {
             denom: UncheckedDenom::Native("juno".into()),
             amount: 1_000u128.into(),
         }),
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
     );
 
     let recipient = mock.addr_make("recipient");
@@ -40,6 +44,14 @@ fn option_queries() {
         mock.sender.clone(),
         recipient.clone(),
         Some(coin(1_000u128, "juno")),
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap();
 
@@ -49,6 +61,14 @@ fn option_queries() {
         einstein.clone(),
         einstein.clone(),
         Some(coin(1_000u128, "juno")),
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap();
 

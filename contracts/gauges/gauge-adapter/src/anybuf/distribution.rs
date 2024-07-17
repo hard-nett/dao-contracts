@@ -6,63 +6,58 @@ use cosmwasm_std::{
 
 use crate::{
     get_coin_from_bytes,
-    msg::{AdapterBankMsg, PossibleMsg, SubmissionMsg},
+    msg::{AdapterBankMsg, AdapterDistributionMsg, PossibleMsg, SubmissionMsg},
     state::CONFIG,
 };
 
 #[cw_serde]
-pub struct ParseBankSubmissionResponse {
+pub struct ParseDistrSubmissionResponse {
     pub coins: Vec<Coin>,
-    pub recipient: String,
 }
 
-pub fn parse_stargate_wire_bank(
+pub fn parse_stargate_wire_distribution(
     deps: Deps,
     anybuf: Anybuf,
     dao: Addr,
     msg: SubmissionMsg,
-    bank_msg: AdapterBankMsg,
+    distr_msg: AdapterDistributionMsg,
     fraction: Decimal,
     possible: Vec<PossibleMsg>,
 ) -> StdResult<CosmosMsg> {
-    match bank_msg {
-        AdapterBankMsg::MsgSend() => {
+    match distr_msg {
+        AdapterDistributionMsg::MsgFundCommunityPool() => {
             // get amount from binaryMsg
-            let bufany: ParseBankSubmissionResponse = parse_bank_submission_msg_bufany(msg.msg);
-            Ok(encode_bank_submission_msg_anybuf(
+            let bufany: ParseDistrSubmissionResponse = parse_distr_submission_msg_bufany(msg.msg);
+            Ok(encode_fund_community_pool_anybuf(
                 deps.clone(),
                 anybuf,
-                dao.to_string(),
-                bufany.recipient,
                 bufany.coins,
+                dao.to_string(),
                 fraction.clone(),
                 possible.clone(),
             )?)
         }
-        AdapterBankMsg::MsgBurn() => todo!(),
     }
 }
 
-pub fn parse_bank_submission_msg_bufany(msg: Binary) -> ParseBankSubmissionResponse {
+pub fn parse_distr_submission_msg_bufany(msg: Binary) -> ParseDistrSubmissionResponse {
     let deserialized = Bufany::deserialize(&msg).unwrap();
-    // bank msg coin proto = 3  // https://github.com/cosmos/cosmos-sdk/blob/v0.50.7/proto/cosmos/bank/v1beta1/tx.proto#L48
-    let coin_bytes = deserialized.repeated_bytes(3).unwrap();
-    let recipient = deserialized.string(2).unwrap();
+    // distribution msg coin proto = 1  // https://github.com/cosmos/cosmos-sdk/blob/v0.50.7/proto/cosmos/distribution/v1beta1/tx.proto#L123
+    let coin_bytes = deserialized.repeated_bytes(1).unwrap();
     let coins = get_coin_from_bytes(coin_bytes);
 
-    ParseBankSubmissionResponse { coins, recipient }
+    ParseDistrSubmissionResponse { coins }
 }
 
-pub fn encode_bank_submission_msg_anybuf(
+pub fn encode_fund_community_pool_anybuf(
     deps: Deps,
     anybuf: Anybuf,
-    sender: String,
-    recipient: String,
     coins: Vec<Coin>,
+    sender: String,
     fraction: Decimal,
     possible: Vec<PossibleMsg>,
 ) -> StdResult<CosmosMsg> {
-    // bank msg coin proto = 3  // https://github.com/cosmos/cosmos-sdk/blob/v0.50.7/proto/cosmos/bank/v1beta1/tx.proto#L48
+    // bank msg coin proto = 1  // https://github.com/cosmos/cosmos-sdk/blob/v0.50.7/proto/cosmos/bank/v1beta1/tx.proto#L48
     let mut anybuf_coins = vec![];
 
     for coin in coins {
@@ -78,14 +73,10 @@ pub fn encode_bank_submission_msg_anybuf(
         anybuf_coins.push(token)
     }
 
-    let proto = anybuf
-        .append_string(1, sender)
-        .append_string(2, recipient) // sets the recipient as value in submission msg
-        .append_repeated_message(3, &anybuf_coins)
-        .into_vec();
+    let proto = anybuf.append_repeated_message(1, &anybuf_coins).into_vec();
 
     let msg: CosmosMsg<Empty> = CosmosMsg::Stargate {
-        type_url: "/cosmos.bank.v1beta1.MsgSend".to_string(),
+        type_url: "/cosmos.distribution.v1beta1.MsgFundCommunityPool".to_string(),
         value: proto.into(),
     };
     Ok(msg)

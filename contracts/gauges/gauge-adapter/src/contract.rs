@@ -1,23 +1,22 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    coin, coins, from_json, to_json_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Empty,
-    Env, MessageInfo, Order, Response, StdResult, Storage, Uint128,
+    coins, from_json, to_json_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Empty, Env,
+    MessageInfo, Order, Response, StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
-use cw20::{Cw20Coin, Cw20ExecuteMsg, Cw20ReceiveMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use cw_denom::UncheckedDenom;
 use cw_utils::{one_coin, PaymentError};
 
 use crate::{
     error::ContractError,
     msg::{
-        AdapterQueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg, MigrateMsg, ReceiveMsg,
-        StargateWire, SubmissionMsg,
+        AdapterCw20Msgs, AdapterQueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg, MigrateMsg,
+        PossibleMsg, ReceiveMsg, StargateWire, SubmissionMsg,
     },
-    state::{Config, Submission, CONFIG, SUBMISSIONS},
+    state::{Config, Submission, CONFIG, POSSIBLE_MESSAGES, SUBMISSIONS},
 };
-use anybuf::{Anybuf, Bufany};
 
 // Version info for migration info.
 const CONTRACT_NAME: &str = "crates.io:marketing-gauge-adapter";
@@ -34,11 +33,13 @@ pub fn instantiate(
     let denom = msg.reward.denom.clone();
     let amount = msg.reward.amount.clone();
     let community_pool = deps.api.addr_validate(&msg.community_pool)?;
+    let submission = msg.possible_msgs;
 
     initialize_submissions(
         deps.storage,
         env.contract.address,
         community_pool.clone(),
+        submission.clone(),
         denom.clone(),
         amount.clone(),
     )?;
@@ -51,17 +52,18 @@ pub fn instantiate(
             .transpose()?,
         community_pool,
         reward: msg.reward.into_checked(deps.as_ref())?,
-        possible_msgs: msg.possible_msgs,
     };
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new())
 }
 
+/// sets up contracts internal state for possible msgs to be permitted for submission msgs
 fn initialize_submissions(
     store: &mut dyn Storage,
     adapter: Addr,
     treasury: Addr,
+    possible: Vec<PossibleMsg>,
     denom: UncheckedDenom,
     amount: Uint128,
 ) -> Result<(), ContractError> {
@@ -74,7 +76,9 @@ fn initialize_submissions(
             }))?,
         },
         UncheckedDenom::Cw20(c) => SubmissionMsg {
-            stargate: StargateWire::Wasm(crate::msg::AdapterWasmMsg::Execute()),
+            stargate: StargateWire::Wasm(crate::msg::AdapterWasmMsg::Cw20(
+                AdapterCw20Msgs::Transfer(),
+            )),
             msg: to_json_binary(&CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
                 contract_addr: c,
                 msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
@@ -86,6 +90,7 @@ fn initialize_submissions(
         },
     };
 
+    POSSIBLE_MESSAGES.save(store, &possible)?;
     SUBMISSIONS.save(
         store,
         treasury.clone(),
@@ -178,8 +183,7 @@ pub mod execute {
             required_deposit,
             community_pool: _,
             reward: _,
-            admin,
-            possible_msgs,
+            admin: _,
         } = CONFIG.load(deps.storage)?;
         if let Some(required_deposit) = required_deposit {
             if let Some(received) = received {
@@ -213,7 +217,7 @@ pub mod execute {
         }
 
         // confirm msg is one of possible_msgs
-        for messages in possible_msgs {
+        for messages in POSSIBLE_MESSAGES.load(deps.storage)? {
             if messages.stargate != msg.stargate {
                 return Err(ContractError::Unauthorized {});
             }
@@ -238,7 +242,6 @@ pub mod execute {
             required_deposit,
             community_pool: _,
             reward: _,
-            possible_msgs,
         } = CONFIG.load(deps.storage)?;
 
         // No refund if no deposit was required.
@@ -283,41 +286,15 @@ mod query {
     use cosmwasm_std::{Coin, CosmosMsg, Decimal, StdError};
 
     use crate::{
-        encode_bank_submission_msg_anybuf,
         msg::{
             AllOptionsResponse, AllSubmissionsResponse, CheckOptionResponse,
             SampleGaugeMsgsResponse, SubmissionResponse,
         },
-        parse_bank_submission_msg_bufany,
+        parse_stargate_wire_bank, parse_stargate_wire_distribution, parse_stargate_wire_staking,
+        parse_stargate_wire_wasm, stargate_to_anybuf,
     };
 
     use super::*;
-
-    pub fn stargate_to_anybuf(deps: Deps, winner: Addr, fraction: Decimal) -> StdResult<CosmosMsg> {
-        let mut anybuf: Anybuf = Anybuf::new();
-        // get winners SubmissionMsg
-        let Submission { msg, sender, .. } = SUBMISSIONS.load(deps.storage, winner)?;
-        let dao = CONFIG.load(deps.storage)?.admin;
-
-        match msg.stargate {
-            StargateWire::Bank(b) => match b {
-                crate::msg::AdapterBankMsg::MsgSend() => {
-                    // get amount from binaryMsg
-                    let bufany = parse_bank_submission_msg_bufany(msg.msg);
-
-                    let msg = encode_bank_submission_msg_anybuf(
-                        anybuf,
-                        bufany.0,
-                        dao.to_string(),
-                        bufany.1,
-                        fraction,
-                    )?;
-                    Ok(msg)
-                }
-            },
-            StargateWire::Wasm(_) => return Err(StdError::GenericErr { msg: "ahh".into() }),
-        }
-    }
 
     pub fn all_options(deps: Deps) -> StdResult<AllOptionsResponse> {
         Ok(AllOptionsResponse {
@@ -346,7 +323,6 @@ mod query {
                 // Gauge already sends chosen tally to this query by using results we send in
                 // all_options query; they are already validated
                 stargate_to_anybuf(deps, deps.api.addr_validate(&winner)?, fraction)
-
             })
             .collect::<StdResult<Vec<CosmosMsg>>>()?;
         Ok(SampleGaugeMsgsResponse { execute })

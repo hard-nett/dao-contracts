@@ -8,8 +8,8 @@ use abstract_cw20::{Cw20Coin as AbsCw20Coin, MinterResponse};
 use crate::{
     contract::{execute, instantiate, migrate, query},
     msg::{
-        AdapterQueryMsg as QueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg, MigrateMsg,
-        PossibleMsg,
+        AdapterBankMsg, AdapterQueryMsg as QueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg,
+        MigrateMsg, PossibleMsg, StargateWire, SubmissionMsg,
     },
 };
 
@@ -33,6 +33,7 @@ impl<Chain> Uploadable for GaugeAdapter<Chain> {
 pub fn setup_gauge_adapter(
     mock: MockBech32,
     required_deposit: Option<AssetUnchecked>,
+    possible_msgs: Option<Vec<PossibleMsg>>,
 ) -> GaugeAdapter<MockBech32> {
     let adapter = GaugeAdapter::new("gauge_adapter", mock.clone());
     adapter.upload().unwrap();
@@ -43,8 +44,8 @@ pub fn setup_gauge_adapter(
         reward: AssetUnchecked::new_native("juno", 1_000_000),
         community_pool: mock.addr_make("community_pool").to_string(),
         possible_msgs: vec![PossibleMsg {
-            stargate: todo!(),
-            max_amount: todo!(),
+            stargate: StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(Uint128::from(1_000u128)),
         }],
     };
     adapter.instantiate(&instantiate, None, None).unwrap();
@@ -57,6 +58,7 @@ pub fn native_submission_helper(
     sender: Addr,
     recipient: Addr,
     native_tokens: Option<Coin>,
+    msg: SubmissionMsg,
 ) -> Result<AppResponse, CwEnvError> {
     if let Some(assets) = native_tokens.clone() {
         let res = adapter.call_as(&sender).execute(
@@ -64,7 +66,7 @@ pub fn native_submission_helper(
                 name: "DAOers".to_string(),
                 url: "https://daodao.zone".to_string(),
                 address: recipient.to_string(),
-                message: todo!(),
+                message: msg.clone(),
             },
             Some(&[assets]),
         );
@@ -75,7 +77,7 @@ pub fn native_submission_helper(
                 name: "DAOers".to_string(),
                 url: "https://daodao.zone".to_string(),
                 address: recipient.to_string(),
-                message: todo!(),
+                message: msg,
             },
             None,
         );

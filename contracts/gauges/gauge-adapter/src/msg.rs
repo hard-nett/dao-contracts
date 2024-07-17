@@ -122,26 +122,35 @@ pub struct SubmissionMsg {
 #[cw_serde]
 pub enum StargateWire {
     Bank(AdapterBankMsg),
+    Distribution(AdapterDistributionMsg),
     // Gov(),
     // Ibc(),
-    // Distribution(),
-    // Staking(AdapterStakingMsg),
+    Staking(AdapterStakingMsg),
     Wasm(AdapterWasmMsg),
 }
 
 #[cw_serde]
 pub enum AdapterBankMsg {
-    // MsgBurn(),
+    MsgBurn(),
     MsgSend(),
 }
-// #[cw_serde]
-// pub enum AdapterStakingMsg {
-//     Delegate(),
-//     Undelegate(),
-//     Redelegate(),
-// }
+#[cw_serde]
+pub enum AdapterDistributionMsg {
+    MsgFundCommunityPool(),
+}
+#[cw_serde]
+pub enum AdapterStakingMsg {
+    MsgDelegate(),
+    MsgRedelegate(),
+}
+
 #[cw_serde]
 pub enum AdapterWasmMsg {
-    Execute(),
-    // Instantiate(),
+    Cw20(AdapterCw20Msgs),
+}
+
+#[cw_serde]
+pub enum AdapterCw20Msgs {
+    Transfer(),
+    // Send(),
 }

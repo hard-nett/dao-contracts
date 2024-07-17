@@ -1,7 +1,8 @@
 use crate::{
     msg::{
-        AdapterQueryMsg, AdapterQueryMsgFns, AllSubmissionsResponse, AssetUnchecked, ExecuteMsg,
-        ExecuteMsgFns, ReceiveMsg, SubmissionResponse,
+        AdapterBankMsg, AdapterQueryMsg, AdapterQueryMsgFns, AllSubmissionsResponse,
+        AssetUnchecked, ExecuteMsg, ExecuteMsgFns, PossibleMsg, ReceiveMsg, SubmissionMsg,
+        SubmissionResponse,
     },
     multitest::suite::{cw20_helper, native_submission_helper, setup_gauge_adapter},
     ContractError,
@@ -9,7 +10,7 @@ use crate::{
 
 use abstract_cw20::msg::Cw20ExecuteMsgFns;
 use abstract_cw20_base::msg::QueryMsgFns;
-use cosmwasm_std::{coin, to_json_binary, Addr, Uint128};
+use cosmwasm_std::{coin, coins, to_json_binary, Addr, BankMsg, Uint128};
 use cw_denom::UncheckedDenom;
 use cw_orch::{mock::MockBech32, prelude::*};
 
@@ -18,7 +19,14 @@ fn create_default_submission() {
     let mock = MockBech32::new("mock");
     let treasury = &mock.addr_make("community_pool");
 
-    let adapter = setup_gauge_adapter(mock.clone(), None);
+    let adapter = setup_gauge_adapter(
+        mock.clone(),
+        None,
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
+    );
 
     // this one is created by default during instantiation
     assert_eq!(
@@ -39,7 +47,14 @@ fn create_default_submission() {
 #[test]
 fn create_submission_no_required_deposit() {
     let mock = MockBech32::new("mock");
-    let adapter = setup_gauge_adapter(mock.clone(), None);
+    let adapter = setup_gauge_adapter(
+        mock.clone(),
+        None,
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
+    );
 
     let recipient = mock.addr_make("recipient");
     mock.add_balance(&mock.sender, vec![coin(1_000, "juno")])
@@ -54,6 +69,14 @@ fn create_submission_no_required_deposit() {
         mock.sender.clone(),
         recipient.clone(),
         Some(coin(1_000, "juno")),
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap_err();
 
@@ -70,6 +93,14 @@ fn create_submission_no_required_deposit() {
         mock.sender.clone(),
         recipient.clone(),
         None,
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap_err();
 
@@ -91,13 +122,28 @@ fn create_submission_no_required_deposit() {
 #[test]
 fn overwrite_existing_submission() {
     let mock = MockBech32::new("mock");
-    let adapter = setup_gauge_adapter(mock.clone(), None);
+    let adapter = setup_gauge_adapter(
+        mock.clone(),
+        None,
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
+    );
     let recipient = mock.addr_make("recipient");
     native_submission_helper(
         adapter.clone(),
         mock.sender.clone(),
         recipient.clone(),
         None,
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap();
 
@@ -117,6 +163,14 @@ fn overwrite_existing_submission() {
         Addr::unchecked("anotheruser"),
         recipient.clone(),
         None,
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap_err();
 
@@ -126,7 +180,21 @@ fn overwrite_existing_submission() {
     );
 
     // Overwriting submission as same author works
-    native_submission_helper(adapter.clone(), mock.sender, recipient.clone(), None).unwrap();
+    native_submission_helper(
+        adapter.clone(),
+        mock.sender,
+        recipient.clone(),
+        None,
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
+    )
+    .unwrap();
 
     let response = adapter.submission(recipient.to_string()).unwrap();
     assert_eq!(response.url, "https://daodao.zone".to_owned());
@@ -141,6 +209,10 @@ fn create_submission_required_deposit() {
             denom: UncheckedDenom::Native("juno".into()),
             amount: 1_000u128.into(),
         }),
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
     );
 
     let recipient = mock.addr_make("recipient");
@@ -155,6 +227,14 @@ fn create_submission_required_deposit() {
         mock.sender.clone(),
         recipient.clone(),
         None,
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap_err();
 
@@ -173,6 +253,14 @@ fn create_submission_required_deposit() {
             denom: "juno".into(),
             amount: 999u128.into(),
         }),
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap_err();
 
@@ -192,6 +280,14 @@ fn create_submission_required_deposit() {
             denom: "wynd".into(),
             amount: 1_000u128.into(),
         }),
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap_err();
 
@@ -209,6 +305,14 @@ fn create_submission_required_deposit() {
             denom: "juno".into(),
             amount: 1_000u128.into(),
         }),
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap();
 
@@ -242,6 +346,10 @@ fn create_receive_required_deposit() {
             denom: UncheckedDenom::Cw20(cw20_addr.to_string()),
             amount: 1_000u128.into(),
         }),
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
     );
 
     let recipient = mock.sender_addr().to_string();
@@ -333,7 +441,14 @@ fn create_receive_required_deposit() {
 #[test]
 fn return_deposits_no_required_deposit() {
     let mock = MockBech32::new("mock");
-    let adapter = setup_gauge_adapter(mock.clone(), None);
+    let adapter = setup_gauge_adapter(
+        mock.clone(),
+        None,
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
+    );
 
     let err = adapter
         .execute(&ExecuteMsg::ReturnDeposits {}, None)
@@ -352,6 +467,10 @@ fn return_deposits_no_admin() {
             denom: UncheckedDenom::Native("juno".into()),
             amount: 1_000u128.into(),
         }),
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
     );
 
     let err = adapter
@@ -371,6 +490,10 @@ fn return_deposits_required_native_deposit() {
             denom: UncheckedDenom::Native("juno".into()),
             amount: 1_000u128.into(),
         }),
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
     );
     mock.add_balance(&mock.sender, vec![coin(1_000u128, "juno")])
         .unwrap();
@@ -382,6 +505,14 @@ fn return_deposits_required_native_deposit() {
         mock.sender.clone(),
         recipient.clone(),
         Some(coin(1_000u128, "juno")),
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap();
 
@@ -426,6 +557,10 @@ fn return_deposits_required_native_deposit_multiple_deposits() {
             denom: UncheckedDenom::Native("juno".into()),
             amount: 1_000u128.into(),
         }),
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
     );
 
     let recipient = mock.addr_make("recipient");
@@ -440,6 +575,14 @@ fn return_deposits_required_native_deposit_multiple_deposits() {
         mock.sender.clone(),
         recipient.clone(),
         Some(coin(1_000u128, "juno")),
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap();
     // Valid submission.
@@ -448,6 +591,14 @@ fn return_deposits_required_native_deposit_multiple_deposits() {
         einstien.clone(),
         einstien.clone(),
         Some(coin(1_000u128, "juno")),
+        SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     )
     .unwrap();
 
@@ -482,12 +633,23 @@ fn return_deposits_required_cw20_deposit() {
             denom: UncheckedDenom::Cw20(cw20.addr_str().unwrap()),
             amount: 1_000u128.into(),
         }),
+        Some(vec![PossibleMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(1_000u128.into()),
+        }]),
     );
-    let binary_msg = to_json_binary(&ReceiveMsg::CreateSubmission {
+    let binary_msg: cosmwasm_std::Binary = to_json_binary(&ReceiveMsg::CreateSubmission {
         name: "DAOers".into(),
         url: "https://daodao.zone".into(),
         address: recipient.to_string(),
-        message: todo!(),
+        message: SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.to_string(),
+                amount: coins(1_000u128, "juno"),
+            })
+            .unwrap(),
+        },
     })
     .unwrap();
 

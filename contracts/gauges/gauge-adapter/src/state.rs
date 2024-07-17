@@ -15,11 +15,13 @@ pub struct Config {
     pub community_pool: Addr,
     /// Total reward amount.
     pub reward: Asset,
-    /// Possible msgs that submissions can include.
-    pub possible_msgs: Vec<PossibleMsg>,
 }
 
-pub const CONFIG: Item<Config> = Item::new("config");
+pub const CONFIG: Item<Config> = Item::new("c");
+pub const POSSIBLE_MESSAGES: Item<Vec<PossibleMsg>> = Item::new("pm");
+
+// All submissions mapped by fund destination address.
+pub const SUBMISSIONS: Map<Addr, Submission> = Map::new("s");
 
 #[cw_serde]
 pub struct Asset {
@@ -34,6 +36,3 @@ pub struct Submission {
     pub url: String,
     pub msg: SubmissionMsg,
 }
-
-// All submissions mapped by fund destination address.
-pub const SUBMISSIONS: Map<Addr, Submission> = Map::new("submissions");
