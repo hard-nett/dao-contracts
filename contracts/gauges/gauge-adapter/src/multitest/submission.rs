@@ -358,7 +358,13 @@ fn create_receive_required_deposit() {
         name: "DAOers".into(),
         url: "https://daodao.zone".into(),
         address: recipient.clone(),
-        message: todo!(),
+        message: SubmissionMsg {
+            stargate: crate::msg::StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            msg: to_json_binary(&BankMsg::Send {
+                to_address: recipient.clone(),
+                amount: coins(1_000u128, "juno"),
+            }).unwrap(),
+        },
     })
     .unwrap();
     // Fails by sending wrong cw20.

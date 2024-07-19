@@ -5,9 +5,7 @@ use cosmwasm_std::{
 };
 
 use crate::{
-    get_coin_from_bytes,
-    msg::{AdapterBankMsg, AdapterDistributionMsg, PossibleMsg, SubmissionMsg},
-    state::CONFIG,
+    get_coin_from_bytes, get_coins_from_bytes, msg::{ AdapterDistributionMsg, PossibleMsg, SubmissionMsg}, state::CONFIG
 };
 
 #[cw_serde]
@@ -44,7 +42,7 @@ pub fn parse_distr_submission_msg_bufany(msg: Binary) -> ParseDistrSubmissionRes
     let deserialized = Bufany::deserialize(&msg).unwrap();
     // distribution msg coin proto = 1  // https://github.com/cosmos/cosmos-sdk/blob/v0.50.7/proto/cosmos/distribution/v1beta1/tx.proto#L123
     let coin_bytes = deserialized.repeated_bytes(1).unwrap();
-    let coins = get_coin_from_bytes(coin_bytes);
+    let coins = get_coins_from_bytes(coin_bytes);
 
     ParseDistrSubmissionResponse { coins }
 }

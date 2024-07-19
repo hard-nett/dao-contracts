@@ -19,7 +19,7 @@ use crate::{
 };
 
 // Version info for migration info.
-const CONTRACT_NAME: &str = "crates.io:marketing-gauge-adapter";
+const CONTRACT_NAME: &str = "crates.io:gauge-adapter-single";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -32,13 +32,13 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let denom = msg.reward.denom.clone();
     let amount = msg.reward.amount.clone();
-    let community_pool = deps.api.addr_validate(&msg.community_pool)?;
+    let treasury = deps.api.addr_validate(&msg.treasury)?;
     let submission = msg.possible_msgs;
 
     initialize_submissions(
         deps.storage,
         env.contract.address,
-        community_pool.clone(),
+        treasury.clone(),
         submission.clone(),
         denom.clone(),
         amount.clone(),
@@ -50,8 +50,9 @@ pub fn instantiate(
             .required_deposit
             .map(|x| x.into_checked(deps.as_ref()))
             .transpose()?,
-        community_pool,
+
         reward: msg.reward.into_checked(deps.as_ref())?,
+        treasury: treasury.clone(),
     };
     CONFIG.save(deps.storage, &config)?;
 
@@ -181,7 +182,7 @@ pub mod execute {
 
         let Config {
             required_deposit,
-            community_pool: _,
+            treasury: _,
             reward: _,
             admin: _,
         } = CONFIG.load(deps.storage)?;
@@ -240,7 +241,7 @@ pub mod execute {
         let Config {
             admin,
             required_deposit,
-            community_pool: _,
+            treasury: _,
             reward: _,
         } = CONFIG.load(deps.storage)?;
 
@@ -376,7 +377,7 @@ mod tests {
     use cw_denom::CheckedDenom;
 
     use crate::{
-        msg::{AssetUnchecked, PossibleMsg},
+        msg::{AdapterBankMsg, AssetUnchecked, PossibleMsg},
         state::Asset,
     };
 
@@ -385,12 +386,12 @@ mod tests {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg {
             admin: "admin".to_owned(),
-            required_deposit: Some(AssetUnchecked::new_cw20("wynd", 10_000_000)),
-            community_pool: "community".to_owned(),
+            required_deposit: Some(AssetUnchecked::new_cw20("juno", 10_000_000)),
+            treasury: "treasury".to_owned(),
             reward: AssetUnchecked::new_native("ujuno", 150_000_000_000),
             possible_msgs: vec![PossibleMsg {
-                stargate: todo!(),
-                max_amount: todo!(),
+                stargate: StargateWire::Bank(AdapterBankMsg::MsgSend()),
+                max_amount: None,
             }],
         };
         instantiate(
@@ -407,11 +408,11 @@ mod tests {
         assert_eq!(
             config.required_deposit,
             Some(Asset {
-                denom: CheckedDenom::Cw20(Addr::unchecked("wynd")),
+                denom: CheckedDenom::Cw20(Addr::unchecked("juno")),
                 amount: Uint128::new(10_000_000)
             })
         );
-        assert_eq!(config.community_pool, "community".to_owned());
+        assert_eq!(config.treasury, "treasury".to_owned());
         assert_eq!(
             config.reward,
             Asset {
@@ -456,12 +457,12 @@ mod tests {
         let reward = Uint128::new(150_000_000_000);
         let msg = InstantiateMsg {
             admin: "admin".to_owned(),
-            required_deposit: Some(AssetUnchecked::new_cw20("wynd", 10_000_000)),
-            community_pool: "community".to_owned(),
+            required_deposit: Some(AssetUnchecked::new_cw20("juno", 10_000_000)),
+            treasury: "treasury".to_owned(),
             reward: AssetUnchecked::new_native("ujuno", reward.into()),
             possible_msgs: vec![PossibleMsg {
-                stargate: todo!(),
-                max_amount: todo!(),
+                stargate: StargateWire::Bank(AdapterBankMsg::MsgSend()),
+                max_amount: None,
             }],
         };
         instantiate(deps.as_mut(), mock_env(), mock_info("user", &[]), msg).unwrap();
@@ -508,12 +509,12 @@ mod tests {
         let reward = Uint128::new(150_000_000_000);
         let msg = InstantiateMsg {
             admin: "admin".to_owned(),
-            required_deposit: Some(AssetUnchecked::new_cw20("wynd", 10_000_000)),
-            community_pool: "community".to_owned(),
-            reward: AssetUnchecked::new_cw20("wynd", reward.into()),
+            required_deposit: Some(AssetUnchecked::new_cw20("juno", 10_000_000)),
+            treasury: "treasury".to_owned(),
+            reward: AssetUnchecked::new_cw20("juno", reward.into()),
             possible_msgs: vec![PossibleMsg {
-                stargate: todo!(),
-                max_amount: todo!(),
+                stargate: StargateWire::Bank(AdapterBankMsg::MsgSend()),
+                max_amount: None,
             }],
         };
         instantiate(deps.as_mut(), mock_env(), mock_info("user", &[]), msg).unwrap();
@@ -538,7 +539,7 @@ mod tests {
             res.execute,
             [
                 CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: "wynd".to_owned(),
+                    contract_addr: "juno".to_owned(),
                     msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
                         recipient: "juno1t8ehvswxjfn3ejzkjtntcyrqwvmvuknzy3ajxy".to_string(),
                         amount: reward * Decimal::percent(41)
@@ -547,7 +548,7 @@ mod tests {
                     funds: vec![]
                 }),
                 CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: "wynd".to_owned(),
+                    contract_addr: "juno".to_owned(),
                     msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
                         recipient: "juno196ax4vc0lwpxndu9dyhvca7jhxp70rmcl99tyh".to_string(),
                         amount: reward * Decimal::percent(33)
@@ -556,7 +557,7 @@ mod tests {
                     funds: vec![]
                 }),
                 CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: "wynd".to_owned(),
+                    contract_addr: "juno".to_owned(),
                     msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
                         recipient: "juno1y0us8xvsvfvqkk9c6nt5cfyu5au5tww23dmh40".to_string(),
                         amount: reward * Decimal::percent(26)
@@ -574,11 +575,11 @@ mod tests {
         let msg = InstantiateMsg {
             admin: "admin".to_owned(),
             required_deposit: None,
-            community_pool: "community".to_owned(),
+            treasury: "treasury".to_owned(),
             reward: AssetUnchecked::new_native("ujuno", 150_000_000_000),
             possible_msgs: vec![PossibleMsg {
-                stargate: todo!(),
-                max_amount: todo!(),
+                stargate: StargateWire::Bank(AdapterBankMsg::MsgSend()),
+                max_amount: None,
             }],
         };
         instantiate(

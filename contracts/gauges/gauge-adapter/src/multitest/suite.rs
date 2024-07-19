@@ -42,7 +42,7 @@ pub fn setup_gauge_adapter(
         admin: mock.sender_addr().to_string(),
         required_deposit,
         reward: AssetUnchecked::new_native("juno", 1_000_000),
-        community_pool: mock.addr_make("community_pool").to_string(),
+        treasury: mock.addr_make("treasury").to_string(),
         possible_msgs: vec![PossibleMsg {
             stargate: StargateWire::Bank(AdapterBankMsg::MsgSend()),
             max_amount: Some(Uint128::from(1_000u128)),

@@ -10,7 +10,7 @@ pub struct InstantiateMsg {
     /// Deposit required for valid submission. This option allows to reduce spam.
     pub required_deposit: Option<AssetUnchecked>,
     /// Address of contract where each deposit is transferred.
-    pub community_pool: String,
+    pub treasury: String,
     /// Total reward amount.
     pub reward: AssetUnchecked,
     /// Possible messages submission can include.
@@ -131,7 +131,7 @@ pub enum StargateWire {
 
 #[cw_serde]
 pub enum AdapterBankMsg {
-    MsgBurn(),
+    // MsgBurn(),
     MsgSend(),
 }
 #[cw_serde]
@@ -143,7 +143,6 @@ pub enum AdapterStakingMsg {
     MsgDelegate(),
     MsgRedelegate(),
 }
-
 #[cw_serde]
 pub enum AdapterWasmMsg {
     Cw20(AdapterCw20Msgs),
@@ -152,5 +151,8 @@ pub enum AdapterWasmMsg {
 #[cw_serde]
 pub enum AdapterCw20Msgs {
     Transfer(),
-    // Send(),
+    Send(),
+    IncreaseAllowance(),
+    DecreaseAllowance(),
+    Mint(),
 }

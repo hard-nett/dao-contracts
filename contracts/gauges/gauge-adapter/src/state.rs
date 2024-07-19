@@ -12,7 +12,7 @@ pub struct Config {
     /// Deposit required for valid submission.
     pub required_deposit: Option<Asset>,
     /// Address of contract where each deposit is transferred.
-    pub community_pool: Addr,
+    pub treasury: Addr,
     /// Total reward amount.
     pub reward: Asset,
 }
