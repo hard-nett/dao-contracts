@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Binary, CosmosMsg, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use cw_denom::CheckedDenom;
 use cw_storage_plus::{Item, Map};
 
@@ -13,8 +13,7 @@ pub struct Config {
     pub required_deposit: Option<Asset>,
     /// Address of contract where each deposit is transferred.
     pub treasury: Addr,
-    /// Total reward amount.
-    pub reward: Asset,
+    pub possible_msg: Vec<PossibleMsg>
 }
 
 pub const CONFIG: Item<Config> = Item::new("c");

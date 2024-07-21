@@ -3,8 +3,8 @@ use cosmwasm_std::{coin, Addr, Coin, CosmosMsg, Decimal, Deps, StdError, StdResu
 
 use crate::{
     msg::StargateWire,
-    parse_stargate_wire_bank, parse_stargate_wire_distribution, parse_stargate_wire_staking,
-    parse_stargate_wire_wasm,
+    parse_stargate_wire_authz, parse_stargate_wire_bank, parse_stargate_wire_distribution,
+    parse_stargate_wire_staking, parse_stargate_wire_wasm,
     state::{Submission, CONFIG, POSSIBLE_MESSAGES, SUBMISSIONS},
 };
 
@@ -39,6 +39,10 @@ pub fn stargate_to_anybuf(deps: Deps, winner: Addr, fraction: Decimal) -> StdRes
         StargateWire::Staking(stake_msg) => {
             parse_stargate_wire_staking(deps, anybuf, dao, msg, stake_msg, fraction, possible)
         }
+        StargateWire::Authz(authz_msg) => {
+            parse_stargate_wire_authz(deps, anybuf, dao, msg, authz_msg, fraction, possible)
+        }
+        StargateWire::Gov(_) => todo!(),
     }
 }
 

@@ -1,5 +1,5 @@
 use abstract_cw_plus_interface::cw20_base::Cw20Base;
-use cosmwasm_std::{coins, Addr, BankMsg, Coin, CosmosMsg, Uint128};
+use cosmwasm_std::{coins, Addr, Coin, Uint128};
 use cw_orch::{interface, mock::cw_multi_test::AppResponse, prelude::*};
 use cw_orch_core::CwEnvError;
 
@@ -8,8 +8,9 @@ use abstract_cw20::{Cw20Coin as AbsCw20Coin, MinterResponse};
 use crate::{
     contract::{execute, instantiate, migrate, query},
     msg::{
-        AdapterBankMsg, AdapterQueryMsg as QueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg,
-        MigrateMsg, PossibleMsg, StargateWire, SubmissionMsg,
+        AdapterBankMsg, AdapterCw20Msgs, AdapterQueryMsg as QueryMsg, AdapterWasmMsg,
+        AssetUnchecked, ExecuteMsg, InstantiateMsg, MigrateMsg, PossibleMsg, StargateWire,
+        SubmissionMsg,
     },
 };
 
@@ -35,6 +36,22 @@ pub fn setup_gauge_adapter(
     required_deposit: Option<AssetUnchecked>,
     possible_msgs: Option<Vec<PossibleMsg>>,
 ) -> GaugeAdapter<MockBech32> {
+    mock.add_balance(&mock.sender, coins(1_000_000, "juno"))
+        .unwrap();
+    let mut msgs = vec![
+        PossibleMsg {
+            stargate: StargateWire::Bank(AdapterBankMsg::MsgSend()),
+            max_amount: Some(Uint128::from(1_000u128)),
+        },
+        PossibleMsg {
+            stargate: StargateWire::Wasm(AdapterWasmMsg::Cw20(AdapterCw20Msgs::Send())),
+            max_amount: Some(Uint128::from(1_000u128)),
+        },
+    ];
+    if let Some(msg) = possible_msgs {
+        msgs.extend(msg);
+    }
+
     let adapter = GaugeAdapter::new("gauge_adapter", mock.clone());
     adapter.upload().unwrap();
 
@@ -43,10 +60,7 @@ pub fn setup_gauge_adapter(
         required_deposit,
         reward: AssetUnchecked::new_native("juno", 1_000_000),
         treasury: mock.addr_make("treasury").to_string(),
-        possible_msgs: vec![PossibleMsg {
-            stargate: StargateWire::Bank(AdapterBankMsg::MsgSend()),
-            max_amount: Some(Uint128::from(1_000u128)),
-        }],
+        possible_msgs: msgs,
     };
     adapter.instantiate(&instantiate, None, None).unwrap();
     adapter

@@ -28,4 +28,7 @@ pub enum ContractError {
 
     #[error("No deposit was required, therefore no deposit can be returned")]
     NoDepositToRefund {},
+
+    #[error("Incorrect message sent in submission. Double check this adapters available messages set when it was created. ")]
+    IncorrectMessage {},
 }

@@ -3,6 +3,8 @@ use cosmwasm_std::{Addr, Binary, CosmosMsg, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 use cw_denom::UncheckedDenom;
 
+use crate::ContractError;
+
 #[cw_serde]
 pub struct InstantiateMsg {
     /// Address that is allowed to return deposits.
@@ -66,6 +68,8 @@ pub enum AdapterQueryMsg {
         /// Sum of all weights should be 1.0 (within rounding error).
         selected: Vec<(String, Decimal)>,
     },
+    #[returns(Vec<PossibleMsg>)]
+    AvailableMessages {},
 
     // Marketing-gauge specific queries to help on frontend
     #[returns(SubmissionResponse)]
@@ -113,26 +117,47 @@ pub struct PossibleMsg {
     pub stargate: StargateWire,
     pub max_amount: Option<Uint128>,
 }
+
 #[cw_serde]
 pub struct SubmissionMsg {
     pub stargate: StargateWire,
     pub msg: Binary,
 }
 
+/// Boilerplate definitions of available messages for adapter to provide to gauge.
+/// Does not include specific values, as these are defined in the message bytes of Submission,
+/// and decoded with Bufany. We can get creative with preconfigured msgs [DAO msgs, Swaps & Multi-Chain].
 #[cw_serde]
 pub enum StargateWire {
+    Authz(AdapterAuthzMsg),
     Bank(AdapterBankMsg),
     Distribution(AdapterDistributionMsg),
-    // Gov(),
+    Gov(AdapterGovMsg),
     // Ibc(),
     Staking(AdapterStakingMsg),
     Wasm(AdapterWasmMsg),
+}
+
+impl std::fmt::Display for StargateWire {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 #[cw_serde]
 pub enum AdapterBankMsg {
     // MsgBurn(),
     MsgSend(),
+}
+#[cw_serde]
+pub enum AdapterGovMsg {
+    MsgSendGovProp(),
+}
+#[cw_serde]
+pub enum AdapterAuthzMsg {
+    MsgGrant(),
+    MsgExec(),
+    MsgRevoke(),
 }
 #[cw_serde]
 pub enum AdapterDistributionMsg {

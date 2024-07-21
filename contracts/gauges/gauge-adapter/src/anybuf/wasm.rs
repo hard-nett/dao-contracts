@@ -1,8 +1,8 @@
 use anybuf::{Anybuf, Bufany};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    from_json, to_json_binary, Addr, Binary, Coin, CosmosMsg, Decimal, Deps, Empty, StdError,
-    StdResult, Uint128,
+    from_json, to_json_binary, Addr, Binary, Coin, CosmosMsg, Decimal, Deps, Empty, StdResult,
+    Uint128,
 };
 use cw20::Expiration;
 
@@ -44,23 +44,22 @@ pub struct Cw20MintMsg {
 }
 
 pub fn parse_stargate_wire_wasm(
-    deps: Deps,
+    _deps: Deps,
     anybuf: Anybuf,
     dao: Addr,
     msg: SubmissionMsg,
     wasm_msg: AdapterWasmMsg,
     fraction: Decimal,
-    possible: Vec<PossibleMsg>,
+    _possible: Vec<PossibleMsg>,
 ) -> StdResult<CosmosMsg> {
     match wasm_msg {
         AdapterWasmMsg::Cw20(cw20_msgs) => match cw20_msgs {
             AdapterCw20Msgs::Transfer() => {
                 let bufany = parse_cw20_bufany(msg.msg);
                 encode_cw20_transfer_anybuf(
-                    deps,
                     anybuf,
                     bufany.contract,
-                    bufany.sender,
+                    dao.to_string(),
                     bufany.exec_msg,
                     bufany.coins,
                     fraction,
@@ -69,7 +68,6 @@ pub fn parse_stargate_wire_wasm(
             AdapterCw20Msgs::Send() => {
                 let bufany = parse_cw20_bufany(msg.msg);
                 encode_cw20_send_anybuf(
-                    deps,
                     anybuf,
                     bufany.contract,
                     bufany.sender,
@@ -81,7 +79,6 @@ pub fn parse_stargate_wire_wasm(
             AdapterCw20Msgs::IncreaseAllowance() => {
                 let bufany = parse_cw20_bufany(msg.msg);
                 encode_cw20_allowance_anybuf(
-                    deps,
                     anybuf,
                     bufany.contract,
                     bufany.sender,
@@ -93,7 +90,6 @@ pub fn parse_stargate_wire_wasm(
             AdapterCw20Msgs::DecreaseAllowance() => {
                 let bufany = parse_cw20_bufany(msg.msg);
                 encode_cw20_allowance_anybuf(
-                    deps,
                     anybuf,
                     bufany.contract,
                     bufany.sender,
@@ -105,7 +101,6 @@ pub fn parse_stargate_wire_wasm(
             AdapterCw20Msgs::Mint() => {
                 let bufany = parse_cw20_bufany(msg.msg);
                 encode_cw20_mint_anybuf(
-                    deps,
                     anybuf,
                     bufany.contract,
                     bufany.sender,
@@ -140,12 +135,11 @@ pub fn parse_cw20_bufany(msg: Binary) -> ParseCw20Response {
 }
 
 pub fn encode_cw20_transfer_anybuf(
-    deps: Deps,
     anybuf: Anybuf,
     contract: String,
     sender: String,
     msg: Binary,
-    coins: Vec<Coin>,
+    _coins: Vec<Coin>,
     fraction: Decimal,
 ) -> StdResult<CosmosMsg> {
     let mut transfer_msg: Cw20TransferMsg = from_json(&msg)?;
@@ -168,12 +162,11 @@ pub fn encode_cw20_transfer_anybuf(
 //// SEND  ////
 
 pub fn encode_cw20_send_anybuf(
-    deps: Deps,
     anybuf: Anybuf,
     contract: String,
     sender: String,
     msg: Binary,
-    coins: Vec<Coin>,
+    _coins: Vec<Coin>,
     fraction: Decimal,
 ) -> StdResult<CosmosMsg> {
     // unwraps the cw20 msg from binary
@@ -197,12 +190,11 @@ pub fn encode_cw20_send_anybuf(
 
 //// INCREASE OR DECREASE ALLOWANCE ////
 pub fn encode_cw20_allowance_anybuf(
-    deps: Deps,
     anybuf: Anybuf,
     contract: String,
     sender: String,
     msg: Binary,
-    coins: Vec<Coin>,
+    _coins: Vec<Coin>,
     fraction: Decimal,
 ) -> StdResult<CosmosMsg> {
     // unwraps the cw20 msg from binary
@@ -226,12 +218,11 @@ pub fn encode_cw20_allowance_anybuf(
 
 //// MINT CW20 ////
 pub fn encode_cw20_mint_anybuf(
-    deps: Deps,
     anybuf: Anybuf,
     contract: String,
     sender: String,
     msg: Binary,
-    coins: Vec<Coin>,
+    _coins: Vec<Coin>,
     fraction: Decimal,
 ) -> StdResult<CosmosMsg> {
     // unwraps the cw20 msg from binary

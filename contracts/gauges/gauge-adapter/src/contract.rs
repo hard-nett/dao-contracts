@@ -13,7 +13,7 @@ use crate::{
     error::ContractError,
     msg::{
         AdapterCw20Msgs, AdapterQueryMsg, AssetUnchecked, ExecuteMsg, InstantiateMsg, MigrateMsg,
-        PossibleMsg, ReceiveMsg, StargateWire, SubmissionMsg,
+        ReceiveMsg, StargateWire, SubmissionMsg,
     },
     state::{Config, Submission, CONFIG, POSSIBLE_MESSAGES, SUBMISSIONS},
 };
@@ -33,13 +33,11 @@ pub fn instantiate(
     let denom = msg.reward.denom.clone();
     let amount = msg.reward.amount.clone();
     let treasury = deps.api.addr_validate(&msg.treasury)?;
-    let submission = msg.possible_msgs;
 
     initialize_submissions(
         deps.storage,
         env.contract.address,
         treasury.clone(),
-        submission.clone(),
         denom.clone(),
         amount.clone(),
     )?;
@@ -50,9 +48,8 @@ pub fn instantiate(
             .required_deposit
             .map(|x| x.into_checked(deps.as_ref()))
             .transpose()?,
-
-        reward: msg.reward.into_checked(deps.as_ref())?,
         treasury: treasury.clone(),
+        possible_msg: msg.possible_msgs,
     };
     CONFIG.save(deps.storage, &config)?;
 
@@ -64,7 +61,6 @@ fn initialize_submissions(
     store: &mut dyn Storage,
     adapter: Addr,
     treasury: Addr,
-    possible: Vec<PossibleMsg>,
     denom: UncheckedDenom,
     amount: Uint128,
 ) -> Result<(), ContractError> {
@@ -91,7 +87,6 @@ fn initialize_submissions(
         },
     };
 
-    POSSIBLE_MESSAGES.save(store, &possible)?;
     SUBMISSIONS.save(
         store,
         treasury.clone(),
@@ -183,8 +178,8 @@ pub mod execute {
         let Config {
             required_deposit,
             treasury: _,
-            reward: _,
             admin: _,
+            possible_msg,
         } = CONFIG.load(deps.storage)?;
         if let Some(required_deposit) = required_deposit {
             if let Some(received) = received {
@@ -218,10 +213,14 @@ pub mod execute {
         }
 
         // confirm msg is one of possible_msgs
-        for messages in POSSIBLE_MESSAGES.load(deps.storage)? {
-            if messages.stargate != msg.stargate {
-                return Err(ContractError::Unauthorized {});
-            }
+        // let pos = POSSIBLE_MESSAGES.load(deps.storage)?;
+
+        if possible_msg
+            .into_iter()
+            .find(|c| c.stargate == msg.stargate)
+            .is_none()
+        {
+            return Err(ContractError::IncorrectMessage {});
         }
 
         SUBMISSIONS.save(
@@ -242,7 +241,7 @@ pub mod execute {
             admin,
             required_deposit,
             treasury: _,
-            reward: _,
+            possible_msg,
         } = CONFIG.load(deps.storage)?;
 
         // No refund if no deposit was required.
@@ -279,20 +278,24 @@ pub fn query(deps: Deps, _env: Env, msg: AdapterQueryMsg) -> StdResult<Binary> {
         AdapterQueryMsg::Submission { address } => {
             to_json_binary(&query::submission(deps, address)?)
         }
-        AdapterQueryMsg::AllSubmissions {} => to_json_binary(&query::all_submissions(deps)?),
+        AdapterQueryMsg::AllSubmissions {} => {
+            to_json_binary(&query::all_submissions(deps)?.submissions)
+        }
+        AdapterQueryMsg::AvailableMessages {} => {
+            to_json_binary(&CONFIG.load(deps.storage)?.possible_msg)
+        }
     }
 }
 
 mod query {
-    use cosmwasm_std::{Coin, CosmosMsg, Decimal, StdError};
+    use cosmwasm_std::{CosmosMsg, Decimal};
 
     use crate::{
         msg::{
             AllOptionsResponse, AllSubmissionsResponse, CheckOptionResponse,
             SampleGaugeMsgsResponse, SubmissionResponse,
         },
-        parse_stargate_wire_bank, parse_stargate_wire_distribution, parse_stargate_wire_staking,
-        parse_stargate_wire_wasm, stargate_to_anybuf,
+        stargate_to_anybuf,
     };
 
     use super::*;
@@ -316,8 +319,6 @@ mod query {
         deps: Deps,
         winners: Vec<(String, Decimal)>,
     ) -> StdResult<SampleGaugeMsgsResponse> {
-        let reward = CONFIG.load(deps.storage)?.reward;
-
         let execute = winners
             .into_iter()
             .map(|(winner, fraction)| {
@@ -413,13 +414,6 @@ mod tests {
             })
         );
         assert_eq!(config.treasury, "treasury".to_owned());
-        assert_eq!(
-            config.reward,
-            Asset {
-                denom: CheckedDenom::Native("ujuno".to_owned()),
-                amount: Uint128::new(150_000_000_000)
-            }
-        );
 
         let msg = InstantiateMsg {
             reward: AssetUnchecked::new_native("ujuno", 10_000_000),
@@ -432,14 +426,6 @@ mod tests {
             msg.clone(),
         )
         .unwrap();
-        let config = CONFIG.load(deps.as_ref().storage).unwrap();
-        assert_eq!(
-            config.reward,
-            Asset {
-                denom: CheckedDenom::Native("ujuno".to_owned()),
-                amount: Uint128::new(10_000_000)
-            }
-        );
 
         let msg = InstantiateMsg {
             required_deposit: None,
