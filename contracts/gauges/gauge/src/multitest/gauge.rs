@@ -540,7 +540,10 @@ fn execute_stopped_gauge() {
     let err = suite
         .stop_gauge(&gauge_contract, voter1, gauge_id)
         .unwrap_err();
-    assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
+    assert_eq!(
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner),
+        err.downcast().unwrap()
+    );
 
     // stop the gauge by owner
     suite
@@ -759,7 +762,10 @@ fn update_gauge() {
             None,
         )
         .unwrap_err();
-    assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
+    assert_eq!(
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner),
+        err.downcast().unwrap()
+    );
 
     let err = suite
         .update_gauge(

@@ -2,11 +2,12 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, CosmosMsg, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 use cw_denom::UncheckedDenom;
+use cw_ownable::cw_ownable_execute;
 
 #[cw_serde]
 pub struct InstantiateMsg {
     /// Address that is allowed to return deposits.
-    pub admin: String,
+    pub owner: String,
     /// Deposit required for valid submission. This option allows to reduce spam.
     pub required_deposit: Option<AssetUnchecked>,
     /// Address of contract where each deposit is transferred.
@@ -15,8 +16,10 @@ pub struct InstantiateMsg {
     pub reward: AssetUnchecked,
 }
 
-#[cw_serde]
+
+#[cw_ownable_execute]
 #[derive(cw_orch::ExecuteFns)]
+#[cw_serde]
 pub enum ExecuteMsg {
     /// Implements the Cw20 receiver interface.
     Receive(Cw20ReceiveMsg),
@@ -50,19 +53,22 @@ pub enum MigrateMsg {}
 #[cw_serde]
 #[derive(QueryResponses, cw_orch::QueryFns)]
 pub enum AdapterQueryMsg {
+    /// Returns adapters internal Config state.
     #[returns(crate::state::Config)]
     Config {},
+    /// Returns all available options to vote for.
     #[returns(AllOptionsResponse)]
     AllOptions {},
+    /// Checks if a provided option is included in the available options. Returns a boolean.
     #[returns(CheckOptionResponse)]
     CheckOption { option: String },
+    /// Returns the messages determined by the current voting results for options.Used by the gauge orchestrator to pass messages for DAO to execute.
     #[returns(SampleGaugeMsgsResponse)]
     SampleGaugeMsgs {
         /// Option along with weight.
         /// Sum of all weights should be 1.0 (within rounding error).
         selected: Vec<(String, Decimal)>,
     },
-
     // Marketing-gauge specific queries to help on frontend
     #[returns(SubmissionResponse)]
     Submission { address: String },

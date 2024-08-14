@@ -466,7 +466,10 @@ mod gauge {
             .call_as(&not_owner)
             .stop_gauge(0)
             .unwrap_err();
-        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
+        assert_eq!(
+            ContractError::Ownership(cw_ownable::OwnershipError::NotOwner),
+            err.downcast().unwrap()
+        );
         dao.gauge_suite
             .orchestrator
             .call_as(&dao_addr)
@@ -648,8 +651,10 @@ mod gauge {
             .call_as(&fake_owner)
             .update_gauge(0, None, None, None, None, Some(Decimal::zero()))
             .unwrap_err();
-        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
-
+        assert_eq!(
+            ContractError::Ownership(cw_ownable::OwnershipError::NotOwner),
+            err.downcast().unwrap()
+        );
         let err = dao
             .gauge_suite
             .orchestrator
@@ -1577,7 +1582,10 @@ mod voting {
             .call_as(&voter1)
             .remove_option(gauge_id, "addedoption2")
             .unwrap_err();
-        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
+        assert_eq!(
+            ContractError::Ownership(cw_ownable::OwnershipError::NotOwner),
+            err.downcast().unwrap()
+        );
         // one has been removed
         let options = dao
             .gauge_suite

@@ -37,7 +37,7 @@ pub fn setup_gauge_adapter(
     adapter.upload().unwrap();
 
     let instantiate = InstantiateMsg {
-        admin: mock.sender_addr().to_string(),
+        owner: mock.sender_addr().to_string(),
         required_deposit,
         reward: AssetUnchecked::new_native("juno", 1_000_000),
         community_pool: mock.addr_make("community_pool").to_string(),
@@ -84,7 +84,7 @@ pub fn setup_cw20_reward_gauge_adapter(
     let cw20 = cw20_helper(mock.clone());
 
     let instantiate = InstantiateMsg {
-        admin: mock.sender_addr().to_string(),
+        owner: mock.sender_addr().to_string(),
         required_deposit,
         reward: AssetUnchecked::new_cw20(&cw20.addr_str().unwrap(), 1_000_000),
         community_pool: mock.addr_make("community_pool").to_string(),

@@ -10,6 +10,9 @@ pub enum ContractError {
 
     #[error("{0}")]
     PaymentError(#[from] PaymentError),
+    
+    #[error("{0}")]
+    Ownership(#[from] cw_ownable::OwnershipError),
 
     #[error("{0}")]
     DenomError(#[from] DenomError),

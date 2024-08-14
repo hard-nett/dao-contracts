@@ -11,9 +11,9 @@ type GaugeId = u64;
 pub struct InstantiateMsg {
     /// Address of contract to that contains all voting powers (where we query)
     pub voting_powers: String,
-    /// Addres that will call voting power change hooks (often same as voting power contract)
+    /// Address that will call voting power change hooks (often same as voting power contract)
     pub hook_caller: String,
-    /// Address that can add new gauges or stop them
+    /// Optional Address that can add new gauges or stop them
     pub owner: String,
     /// Allow attaching multiple adaptors during instantiation.
     /// Important, as instantiation and CreateGauge both come from DAO proposals
@@ -105,31 +105,39 @@ pub struct CreateGaugeReply {
 #[cw_serde]
 #[derive(QueryResponses, cw_orch::QueryFns)]
 pub enum QueryMsg {
+    /// General contract info
     #[returns(dao_interface::voting::InfoResponse)]
     Info {},
+    /// Returns details for a specific gauge.
     #[returns(GaugeResponse)]
     Gauge { id: u64 },
+    /// List all gauges
     #[returns(ListGaugesResponse)]
     ListGauges {
         start_after: Option<u64>,
         limit: Option<u32>,
     },
+    /// Returns the vote for a given voter
     #[returns(VoteResponse)]
     Vote { gauge: u64, voter: String },
+    /// Returns a list of all unexpired votes for a specific gauge-id
     #[returns(ListVotesResponse)]
     ListVotes {
         gauge: u64,
         start_after: Option<String>,
         limit: Option<u32>,
     },
+    /// Returns a list of all options available to vote for a specific gauge-id
     #[returns(ListOptionsResponse)]
     ListOptions {
         gauge: u64,
         start_after: Option<String>,
         limit: Option<u32>,
     },
+    /// Returns the selected messages that were determined by voting
     #[returns(SelectedSetResponse)]
     SelectedSet { gauge: u64 },
+    /// Returns the last selected messages that were executed by the DAO
     #[returns(LastExecutedSetResponse)]
     LastExecutedSet { gauge: u64 },
 }

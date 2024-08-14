@@ -185,7 +185,10 @@ fn remove_option() {
         .remove_option(&gauge_contract, voter1, gauge_id, "addedoption2")
         .unwrap_err();
 
-    assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
+    assert_eq!(
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner),
+        err.downcast().unwrap()
+    );
 
     let options = suite.query_list_options(&gauge_contract, gauge_id).unwrap();
     // one has been removed
@@ -497,7 +500,13 @@ fn votes_stays_the_same_after_execution() {
 
     suite.next_block();
     let gauge_config = suite
-        .instantiate_adapter_and_return_config(&[voter1, voter2], reward_to_distribute, None, None,None)
+        .instantiate_adapter_and_return_config(
+            &[voter1, voter2],
+            reward_to_distribute,
+            None,
+            None,
+            None,
+        )
         .unwrap();
     suite
         .propose_update_proposal_module(voter1.to_string(), vec![gauge_config])
@@ -620,7 +629,8 @@ fn vote_for_max_capped_option() {
             &[voter1, voter2],
             (1000, "ujuno"),
             Some(Decimal::percent(10)),
-            None,None,
+            None,
+            None,
         )
         .unwrap();
 

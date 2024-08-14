@@ -34,14 +34,13 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    cw_ownable::initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
 
     let voting_powers = deps.api.addr_validate(&msg.voting_powers)?;
     let hook_caller = deps.api.addr_validate(&msg.hook_caller)?;
-    let owner = deps.api.addr_validate(&msg.owner)?;
     let config = Config {
         voting_powers,
         hook_caller,
-        owner,
         dao_core: info.sender,
     };
     CONFIG.save(deps.storage, &config)?;
@@ -372,10 +371,7 @@ mod execute {
         sender: Addr,
         options: GaugeConfig,
     ) -> Result<Response, ContractError> {
-        let config = CONFIG.load(deps.storage)?;
-        if sender != config.owner {
-            return Err(ContractError::Unauthorized {});
-        }
+        cw_ownable::assert_owner(deps.storage, &sender)?;
 
         let adapter = attach_gauge(deps, env, options)?;
 
@@ -460,10 +456,7 @@ mod execute {
         max_options_selected: Option<u32>,
         max_available_percentage: Option<Decimal>,
     ) -> Result<Response, ContractError> {
-        let config = CONFIG.load(deps.storage)?;
-        if sender != config.owner {
-            return Err(ContractError::Unauthorized {});
-        }
+        cw_ownable::assert_owner(deps.storage, &sender)?;
 
         let mut gauge = GAUGES.load(deps.storage, gauge_id)?;
         if let Some(epoch_size) = epoch_size {
@@ -513,10 +506,7 @@ mod execute {
         sender: Addr,
         gauge_id: GaugeId,
     ) -> Result<Response, ContractError> {
-        let config = CONFIG.load(deps.storage)?;
-        if sender != config.owner {
-            return Err(ContractError::Unauthorized {});
-        }
+        cw_ownable::assert_owner(deps.storage, &sender)?;
 
         let gauge = GAUGES.load(deps.storage, gauge_id)?;
         let gauge = Gauge {
@@ -542,10 +532,7 @@ mod execute {
         };
 
         // only owner can remove option for now
-        if sender != CONFIG.load(deps.storage)?.owner {
-            return Err(ContractError::Unauthorized {});
-        }
-
+        cw_ownable::assert_owner(deps.storage, &sender)?;
         remove_tally(deps.storage, gauge_id, &option)?;
 
         Ok(Response::new()
@@ -817,7 +804,6 @@ mod execute {
 
         msgs.extend(execute_messages.execute);
 
-     
         // increments epoch count
         gauge.count = gauge.increment_gauge_count()?;
 

@@ -144,7 +144,7 @@ impl DaoDaoCw4Gauge<MockBech32> {
         // init adapter
         let adapter = self.gauge_suite.adapter.instantiate(
             &gauge_adapter::msg::InstantiateMsg {
-                admin: self.dao_core.address()?.to_string(),
+                owner: self.dao_core.address()?.to_string(),
                 required_deposit: None,
                 community_pool: self.dao_core.address()?.to_string(),
                 reward: AssetUnchecked::new_native("ujuno", 1000u128),

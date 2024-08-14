@@ -8,6 +8,8 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
+    #[error("{0}")]
+    Ownership(#[from] cw_ownable::OwnershipError),
 
     #[error("Gauge with ID {0} does not exists")]
     GaugeMissing(u64),

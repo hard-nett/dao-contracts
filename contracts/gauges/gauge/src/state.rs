@@ -37,8 +37,6 @@ pub struct Config {
     pub voting_powers: Addr,
     /// Addres that will call voting power change hooks (often same as voting power contract)
     pub hook_caller: Addr,
-    /// Address that can add new gauges or stop them
-    pub owner: Addr,
     /// Address of DAO core module resposible for instantiation and execution of messages
     pub dao_core: Addr,
 }
@@ -119,7 +117,7 @@ pub struct WeightedVotes {
 }
 
 impl WeightedVotes {
-    /// Returns `true` if the vote is
+    /// Returns `true` if the vote is expired
     pub fn is_expired(&self, gauge: &Gauge) -> bool {
         // check if the vote is older than the last reset
         match &gauge.reset {
