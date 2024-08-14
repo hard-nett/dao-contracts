@@ -2,7 +2,6 @@ use cw_orch::{anyhow, prelude::*};
 
 use crate::DaoDao;
 
-mod deploy;
 mod distribution;
 mod external;
 mod propose;

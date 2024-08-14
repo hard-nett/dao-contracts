@@ -2,6 +2,7 @@
 fn main() {}
 
 mod dao;
+mod deploy;
 mod external;
 mod distribution;
 mod propose;
